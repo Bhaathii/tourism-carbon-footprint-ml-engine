@@ -12,6 +12,8 @@ unavailable.
 """
 
 import re
+from typing import Optional, List
+
 import ollama
 from emission_analysis import TransportMetrics, EMISSION_FACTORS_PKM, RuleBasedMetrics, build_dss_prompt
 
@@ -191,7 +193,7 @@ Rules:
 # Output parser
 # ---------------------------------------------------------------------------
 
-def parse_recommendation_output(text: str) -> dict | None:
+def parse_recommendation_output(text: str) -> Optional[dict]:
     """
     Parse the structured LLM output into a Python dict.
 
@@ -215,7 +217,7 @@ def parse_recommendation_output(text: str) -> dict | None:
     or ``None`` if parsing fails (caller falls back to raw markdown display).
     """
     try:
-        recs: list[dict] = []
+        recs: List[dict] = []
 
         # Split on lines that start a new numbered item (1. / 2. / 3.)
         blocks = re.split(r"\n(?=\d+\.\s)", text.strip())
@@ -426,8 +428,8 @@ def get_ollama_recommendation(
     trip_data: dict,
     location: str = "Sri Lanka",
     vehicle_type: str = "Private Car",
-    metrics: TransportMetrics | None = None,
-    rbm: RuleBasedMetrics | None = None,
+    metrics: Optional[TransportMetrics] = None,
+    rbm: Optional[RuleBasedMetrics] = None,
     model: str = "gemma3:1b",
 ) -> tuple[str, bool]:
     """
@@ -443,9 +445,9 @@ def get_ollama_recommendation(
         The tourist's current Sri Lankan destination (e.g. 'Ella', 'Colombo').
     vehicle_type : str
         The primary vehicle used (e.g. 'Private Car', 'Train').
-    metrics : TransportMetrics | None
+    metrics : Optional[TransportMetrics]
         Legacy quantitative metrics (used as fallback if rbm is None).
-    rbm : RuleBasedMetrics | None
+    rbm : Optional[RuleBasedMetrics]
         Level-2 DSS rule-based metrics from ``run_rule_based_analysis``.
         When provided, ``build_dss_prompt`` is used for the highest-quality output.
     model : str
@@ -463,11 +465,13 @@ def get_ollama_recommendation(
         prompt = _build_quantitative_prompt(emission_level, trip_data, location, vehicle_type, metrics)
 
     try:
-        response = ollama.chat(
+        # Use ollama.generate() with the /api/generate endpoint
+        response = ollama.generate(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            prompt=prompt,
+            stream=False,
         )
-        text = response["message"]["content"].strip()
+        text = response["response"].strip()
         return text, True
 
     except Exception as exc:  # noqa: BLE001

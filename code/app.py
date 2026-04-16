@@ -228,16 +228,14 @@ if st.button("🔮 Predict Emission Level", use_container_width=True):
     # ── 3-bar comparison chart: current / full-occ / train baseline ──────────
     # Chart uses g CO₂/pax-km (rate) so all three bars are on the same scale
     # regardless of trip distance — enabling direct cross-mode comparison.
-    chart_df = pd.DataFrame(
-        {
-            "g CO₂ / pax-km  (standardised rate)": {
-                f"🔵 Current · {vehicle_type}": rbm.per_passenger_g_per_km,
-                f"🟡 Full Occ · {rbm.full_occ_passengers} pax (same vehicle)": rbm.full_occ_g_per_km,
-                "🟢 Train Baseline · IEA 2023": rbm.train_baseline_g_per_pkm,
-            }
-        }
-    )
-    st.bar_chart(chart_df, width="stretch", height=200)
+    st.subheader("💨 Emission Comparison")
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        st.metric(f"🔵 Current ({vehicle_type})", f"{rbm.per_passenger_g_per_km:.1f}", "g CO₂/pax-km")
+    with col_m2:
+        st.metric(f"🟡 Full Occ ({rbm.full_occ_passengers} pax)", f"{rbm.full_occ_g_per_km:.1f}", "g CO₂/pax-km")
+    with col_m3:
+        st.metric("🟢 Train Baseline", f"{rbm.train_baseline_g_per_pkm:.1f}", "g CO₂/pax-km")
     st.caption(
         "📊 Y-axis: **g CO₂ / pax-km** — a distance-normalised, per-person rate that makes "
         "vehicles of different sizes directly comparable. "
@@ -340,7 +338,11 @@ if st.button("🔮 Predict Emission Level", use_container_width=True):
                 "Detail":   rbm.efficiency_note,
             },
         ])
-        st.dataframe(dss_table, width="stretch", hide_index=True)
+        # Display as formatted text instead of dataframe to avoid PyArrow
+        for idx, row in dss_table.iterrows():
+            st.markdown(f"**{row['Metric']}**")
+            st.markdown(f"- Value: {row['Value']}")
+            st.markdown(f"- Detail: {row['Detail']}")
 
         st.markdown("**Full emission breakdown (all categories)**")
         breakdown_df = pd.DataFrame([
@@ -351,8 +353,8 @@ if st.button("🔮 Predict Emission Level", use_container_width=True):
             {"Category": "Waste",                      "kgCO₂": input_dict["waste_emissions_kgCO2"]},
             {"Category": "Plastic",                    "kgCO₂": input_dict["plastic_emissions_kgCO2"]},
         ])
-        st.dataframe(
-            breakdown_df.sort_values("kgCO₂", ascending=False).reset_index(drop=True),
-            width="stretch", hide_index=True,
-        )
+        # Display as formatted text instead of dataframe to avoid PyArrow
+        breakdown_sorted = breakdown_df.sort_values("kgCO₂", ascending=False).reset_index(drop=True)
+        for idx, row in breakdown_sorted.iterrows():
+            st.markdown(f"**{row['Category']}**: {row['kgCO₂']:.3f} kgCO₂")
 
