@@ -154,11 +154,59 @@ if st.button("🔮 Predict Emission Level", use_container_width=True):
     # names it was trained with — eliminates sklearn UserWarning.
     prediction = model.predict(aligned_df)[0]
 
+    # ── Layer 2.5: ML Verification & Correction ──────────────────────────────────
+    # The ML model sometimes misclassifies based on individual feature patterns.
+    # This verification layer checks against the actual total emissions and corrects
+    # obvious misclassifications using the empirical thresholds from training data.
+    #
+    # Thresholds (from 5000-record training dataset, percentile-based):
+    #   LOW:    ≤ 67.25 kgCO₂
+    #   MEDIUM: 67.25 - 162.92 kgCO₂
+    #   HIGH:   > 162.92 kgCO₂
+    
+    actual_total_emissions = (
+        transport_emissions_kgCO2 + accommodation_elec_kgCO2 + 
+        accommodation_gen_kgCO2 + food_emissions_kgCO2 + 
+        waste_emissions_kgCO2 + plastic_emissions_kgCO2
+    )
+    
+    # Define thresholds (same as training.py)
+    THRESHOLD_LOW_TO_MEDIUM = 67.25
+    THRESHOLD_MEDIUM_TO_HIGH = 162.92
+    
+    def classify_by_actual_emissions(total_emissions):
+        """Classify based on actual total emissions (ground truth)."""
+        if total_emissions <= THRESHOLD_LOW_TO_MEDIUM:
+            return 'low'
+        elif total_emissions <= THRESHOLD_MEDIUM_TO_HIGH:
+            return 'medium'
+        else:
+            return 'high'
+    
+    actual_classification = classify_by_actual_emissions(actual_total_emissions)
+    
+    # Compare ML prediction vs actual total emissions
+    ml_confidence_issue = False
+    if prediction.lower() != actual_classification:
+        ml_confidence_issue = True
+        # Override the prediction with the ground-truth classification
+        original_ml_prediction = prediction
+        prediction = actual_classification
+    
     # ── ML Emission level badge ──────────────────────────────────────────────────
     st.divider()
     level_colours = {"low": "🟢", "medium": "🟡", "high": "🔴"}
     icon = level_colours.get(prediction.lower(), "⚪")
     st.subheader(f"{icon} ML Classification: Emission Level **{prediction.upper()}**")
+    
+    # Show warning if ML prediction was corrected
+    if ml_confidence_issue:
+        st.warning(
+            f"⚠️ **ML Verification Applied**: Actual total emissions "
+            f"({actual_total_emissions:.2f} kgCO₂) indicate **{actual_classification.upper()}** level, "
+            f"not {original_ml_prediction.upper()}. Classification corrected to match ground truth."
+        )
+    
     st.info(get_quick_badge(prediction))
 
     # ── Level-2 DSS: Rule-Based Layer ─────────────────────────────────────────

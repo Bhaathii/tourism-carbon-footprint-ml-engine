@@ -266,6 +266,9 @@ class RuleBasedMetrics:
     # ── Metric 4: Efficiency label ─────────────────────────────────────
     efficiency_label: str   # 'EFFICIENT' | 'MODERATE' | 'INEFFICIENT'
     efficiency_note:  str
+    
+    # ── Vehicle type detection ─────────────────────────────────────────
+    vehicle_is_already_optimal: bool  # True if user is on low-emission base mode (Train, Bus, e-tuk, Bicycle)
 
 
 def run_rule_based_analysis(
@@ -286,6 +289,17 @@ def run_rule_based_analysis(
     vehicle_type   : str   — Streamlit selectbox value.
     emission_level : str   — ML model prediction ('low' | 'medium' | 'high').
     """
+    # ── Detect if vehicle is already in optimal low-emission mode ─────────────
+    # These vehicles are already at or near the 14 g/pax-km IEA baseline.
+    # Recommendations should focus on increasing occupancy instead of mode-switching.
+    OPTIMAL_VEHICLES = {
+        "Train",
+        "Public Bus (CTB)",
+        "Electric Tuk-tuk (e-tuk)",
+        "Bicycle",
+    }
+    vehicle_is_optimal = vehicle_type in OPTIMAL_VEHICLES
+    
     # All denominators guarded against zero (same pattern as compute_transport_metrics)
     total       = max(float(trip_data.get("transport_emissions_kgCO2", 0.0)), 0.0)  # kgCO₂
     distance_km = max(float(trip_data.get("distance_km", 1.0)), 0.1)               # km
@@ -357,6 +371,7 @@ def run_rule_based_analysis(
         current_is_greener_than_train=is_greener,
         efficiency_label=eff_label,
         efficiency_note=eff_note,
+        vehicle_is_already_optimal=vehicle_is_optimal,
     )
 
 
@@ -376,6 +391,12 @@ def build_dss_prompt(rbm: RuleBasedMetrics, location: str = "Sri Lanka") -> str:
     a saving percentage because there is no blank for it to fill.
     sanitize_numbers_lines() in ollama_recommendations.py acts as a
     second safety net.
+    
+    Logic for recommendations:
+      - If user is ALREADY on optimal vehicle (Train/Bus/e-tuk/Bicycle):
+        ALL 3 recommendations focus on occupancy sharing + location tips
+      - If user is on non-optimal vehicle (Private car/Tuk-tuk/etc):
+        Recommend switching to better mode + occupancy tips
     """
     # ── Pre-compute the two NUMBERS strings ──────────────────────────────────
     # These are injected verbatim — the LLM must copy them unchanged.
@@ -392,11 +413,19 @@ def build_dss_prompt(rbm: RuleBasedMetrics, location: str = "Sri Lanka") -> str:
     )
 
     # Assign numbers + action hints per slot
-    if rbm.current_is_greener_than_train:
+    # Priority logic: check if vehicle is already optimal FIRST
+    if rbm.vehicle_is_already_optimal:
+        # User is on Train/Bus/e-tuk/Bicycle — all 3 should focus on occupancy sharing
+        n1, hint1 = _n_occ,   "fill all seats on your vehicle"
+        n2, hint2 = _n_occ,   "book group/shared tickets"
+        n3, hint3 = _n_occ,   "carpool or join an organised tour"
+    elif rbm.current_is_greener_than_train:
+        # User is on a good vehicle but not the standard modes — focus on occupancy
         n1, hint1 = _n_occ,   "share vehicle / fill all seats"
         n2, hint2 = _n_occ,   "use shared tuk-tuk or group transport"
         n3, hint3 = _n_occ,   "carpool or join organised tour group"
     else:
+        # User is on a high-emission vehicle — recommend better modes
         n1, hint1 = _n_train, "switch to train or public transport"
         n2, hint2 = _n_occ,   "share vehicle / fill to full occupancy"
         n3, hint3 = _n_train, "use CTB bus or e-tuk instead of car"

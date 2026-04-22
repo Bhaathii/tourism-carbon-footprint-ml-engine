@@ -1,0 +1,53 @@
+
+in this project what are the data pres+processing methods i used..
+
+Optimizing tool selection...
+
+I'll explore your project to identify the data preprocessing methods used.
+
+Based on my analysis of our project, here are the data preprocessing methods you used:
+
+Preprocessing Methods
+1. Target Variable Creation
+Percentile-based Classification: Converted continuous total_trip_emissions_kgCO2 into 3 classes (low, medium, high) using 33rd and 67th percentiles
+
+2. Data Leakage Removal
+Dropped emission component columns: Removed 9 columns that directly contribute to total emissions:
+transport_emissions_kgCO2, accommodation_elec_kgCO2, accommodation_gen_kgCO2, festival_gen_emissions_kgCO2, pilgrimage_emissions_kgCO2, food_emissions_kgCO2, rice_emissions_kgCO2, waste_emissions_kgCO2, plastic_emissions_kgCO2
+Also removed: record_id, trip_start_date
+
+3. Categorical Encoding
+One-Hot Encoding: Used pd.get_dummies() to convert categorical features (vehicle types, etc.) into binary columns with drop_first=True to avoid multicollinearity
+
+4. Missing Value Handling
+Filled NaNs with zero: feature_df.fillna(0)
+
+5. Feature Scaling
+StandardScaler: Applied to models requiring normalization (Logistic Regression only)
+
+6. Train-Test Split
+80-20 split with random_state=42 for reproducibility
+
+7. Input Validation Layer
+7 validation rules (in input_validation.py):
+Vehicle capacity checks
+Distance sanity (positive values)
+Geographic feasibility (Sri Lankan context)
+Trip-day realism
+Emission physics floor checks
+Negative value detection
+Motorcycle/Bicycle occupancy limits
+
+8. Feature Engineering
+Per-passenger metrics: Derived from raw features (transport emissions ÷ occupancy)
+Per-km metrics: Computed for cross-mode comparisons
+Counterfactual alternatives: Calculated alternative transportation mode emissions
+All preprocessing ensures clean, credible data without data leakage, ready for the ML model.
+
+
+model training
+3 files have 3-model training:
+
+model_comparison.py — Trains Logistic Regression, Decision Tree, Random Forest
+model_comparison_proper.py — Trains Logistic Regression, Decision Tree, Random Forest (with feature scaling)
+model_comparison_final.py — Trains Logistic Regression, Decision Tree, Random Forest (with hyperparameter optimization)

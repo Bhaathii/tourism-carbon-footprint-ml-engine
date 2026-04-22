@@ -344,9 +344,18 @@ def sanitize_numbers_lines(ai_text: str, rbm: RuleBasedMetrics) -> str:
     line, this function restores the correct value deterministically.
 
     Slot assignment (same logic as build_dss_prompt):
-      Slot 1 → train numbers  (or occ if already greener than train)
-      Slot 2 → occupancy numbers
-      Slot 3 → train numbers  (or occ if already greener than train)
+      If vehicle_is_already_optimal (Train/Bus/e-tuk/Bicycle):
+        Slot 1 → occupancy numbers
+        Slot 2 → occupancy numbers
+        Slot 3 → occupancy numbers
+      Else if already greener than train baseline:
+        Slot 1 → occupancy numbers
+        Slot 2 → occupancy numbers
+        Slot 3 → occupancy numbers
+      Else (high-emission vehicle):
+        Slot 1 → train numbers
+        Slot 2 → occupancy numbers
+        Slot 3 → train numbers
     """
     _n_train = (
         f"{rbm.per_passenger_g_per_km:.1f} g/pax-km "
@@ -359,10 +368,13 @@ def sanitize_numbers_lines(ai_text: str, rbm: RuleBasedMetrics) -> str:
         f"→ save {rbm.full_occ_reduction_pct}%"
     )
 
-    if rbm.current_is_greener_than_train:
-        slot_nums = [_n_occ, _n_occ, _n_occ]
+    # Match the logic in build_dss_prompt
+    if rbm.vehicle_is_already_optimal:
+        slot_nums = [_n_occ, _n_occ, _n_occ]  # All occupancy-focused
+    elif rbm.current_is_greener_than_train:
+        slot_nums = [_n_occ, _n_occ, _n_occ]  # All occupancy-focused
     else:
-        slot_nums = [_n_train, _n_occ, _n_train]
+        slot_nums = [_n_train, _n_occ, _n_train]  # Mixed: mode-switch + occupancy
 
     slot = 0
     result = []

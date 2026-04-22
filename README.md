@@ -59,7 +59,7 @@ pip install -r requirements.txt
 **Option 1: Web Interface (Recommended)**
 ```bash
 cd code
-streamlit run app.py
+streamlit run code/app.py
 ```
 The app will open at `http://localhost:8501`
 
